@@ -10,7 +10,7 @@ declare_id!("A9RfydetpSqT5rLRZNmeVaeyqG84tXm8cNZkn6Zy1817");
 pub mod pda_test {
     use super::*;
 
-    pub fn maak_bedrijf(ctx: Context<MaakBedrijf>, naam: String, omschrijving: String, url: String, geverifieerd: bool, bump: u8) -> Result<()> {
+    pub fn maak_bedrijf(ctx: Context<MaakBedrijf>, naam: String, omschrijving: String, url: String, geverifieerd: bool, bump: u8, id: u8) -> Result<()> {
         let bedrijf = &mut ctx.accounts.bedrijf;
 
         require!(naam.len()         < MAX_LENGTE_NAAM,         BedrijfError::BedrijfsnaamTeLang);
@@ -24,6 +24,8 @@ pub mod pda_test {
         bedrijf.omschrijving = omschrijving;
         bedrijf.url          = url;
         bedrijf.geverifieerd = geverifieerd;
+
+        bedrijf.id = id;
         
         Ok(())
     }
@@ -45,7 +47,9 @@ pub struct Bedrijf {
     naam:         String,
     omschrijving: String,
     url:          String,
-    geverifieerd: bool
+    geverifieerd: bool,
+
+    id: u8
 }
 
 impl Bedrijf {
@@ -56,13 +60,14 @@ impl Bedrijf {
         4 + MAX_LENGTE_NAAM +         // 4 bytes string discriminator + max lengte v/d string
         4 + MAX_LENGTE_OMSCHRIJVING + // ditto
         4 + MAX_LENGTE_URL +          // ditto
-        1 // een bool wordt weergegeven als een u8, dus ook één byte (zie ook: https://github.com/near/borsh)
+        1 + // een bool wordt weergegeven als een u8, dus ook één byte (zie ook: https://github.com/near/borsh)
+        1   // de id is ook een u8
     }
 }
 
 // validation struct
 #[derive(Accounts)]
-#[instruction(bump: u8)]
+#[instruction(bump: u8, id: u8)]
 pub struct MaakBedrijf<'info> {
     #[account(mut)]
     pub gebruiker: Signer<'info>,
@@ -71,7 +76,7 @@ pub struct MaakBedrijf<'info> {
         init,
         payer = gebruiker,
         space = 8 + Bedrijf::ruimte(), 
-        seeds = [b"bedrijfpda", gebruiker.key().as_ref()],
+        seeds = [b"bedrijfpda", gebruiker.key().as_ref(), &[id]],
         bump
     )]
     pub bedrijf: Account<'info, Bedrijf>,
@@ -82,7 +87,7 @@ pub struct MaakBedrijf<'info> {
 #[derive(Accounts)]
 pub struct ChangeUserName<'info> {
     pub gebruiker: Signer<'info>,
-    #[account(mut, seeds = [b"bedrijfpda", gebruiker.key().as_ref()], bump = bedrijf.bump)]
+    #[account(mut, seeds = [b"bedrijfpda", &[bedrijf.id]], bump = bedrijf.bump)]
     pub bedrijf: Account<'info, Bedrijf>,
 }
 
